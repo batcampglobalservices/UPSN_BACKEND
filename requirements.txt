@@ -1,0 +1,17 @@
+asgiref
+Django>=5.0.0
+django-cors-headers>=4.3.0
+djangorestframework>=3.14.0
+djangorestframework-simplejwt>=5.3.0
+dj-database-url
+PyJWT
+pytz
+sqlparse
+psycopg2-binary
+python-dotenv
+python-decouple
+gunicorn
+whitenoise
+django-filter>=23.0
+Pillow>=10.0.0
+reportlab>=4.0.0
