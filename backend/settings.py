@@ -258,6 +258,6 @@ CORS_ALLOW_HEADERS = [
 # CSRF Configuration for production
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
-    default='http://localhost:3000,http://localhost:5173',
+    default='https://upsn-website.vercel.app,http://localhost:5173',
     cast=Csv()
 )
