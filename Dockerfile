@@ -21,31 +21,15 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install gunicorn psycopg2-binary
 
+# Copy entrypoint script first
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Copy project files
 COPY . .
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
-
-# Create entrypoint script
-COPY <<EOF /app/entrypoint.sh
-#!/bin/bash
-set -e
-
-echo "Running database migrations..."
-python manage.py migrate --noinput
-
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
-
-echo "Starting Gunicorn on port \${PORT:-8000}..."
-exec gunicorn backend.wsgi:application --bind 0.0.0.0:\${PORT:-8000} --workers 4 --timeout 120 --access-logfile - --error-logfile -
-EOF
-
-RUN chmod +x /app/entrypoint.sh
-
-# Expose port
-EXPOSE 8000
 
 # Run the entrypoint script
 CMD ["/app/entrypoint.sh"]
