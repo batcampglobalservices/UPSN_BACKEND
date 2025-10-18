@@ -38,8 +38,8 @@ python manage.py migrate --noinput\n\
 echo "Collecting static files..."\n\
 python manage.py collectstatic --noinput\n\
 echo "Starting Gunicorn..."\n\
-exec gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120 --access-logfile - --error-logfile -\n\
+exec gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --timeout 120 --access-logfile - --error-logfile -\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Run the entrypoint script
-CMD ["/app/entrypoint.sh"]
+CMD ["/bin/bash", "/app/entrypoint.sh"]
