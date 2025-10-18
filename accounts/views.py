@@ -1,3 +1,34 @@
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def admin_update_user_class(request):
+    """
+    Admin endpoint to update a user's class (pupil_class) by user id.
+    Accepts JSON: { "user_id": <user_id>, "pupil_class": <class_id or null> }
+    """
+    user_id = request.data.get('user_id')
+    pupil_class_id = request.data.get('pupil_class')
+    if not user_id:
+        return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        user = CustomUser.objects.get(id=user_id)
+    except CustomUser.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    if user.role != 'pupil':
+        return Response({'error': 'User is not a pupil'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        profile = user.pupil_profile
+    except PupilProfile.DoesNotExist:
+        return Response({'error': 'PupilProfile not found for user'}, status=status.HTTP_404_NOT_FOUND)
+    if pupil_class_id in [None, '']:
+        profile.pupil_class = None
+        profile.save()
+        return Response({'message': 'Pupil class cleared successfully'}, status=status.HTTP_200_OK)
+    try:
+        profile.pupil_class_id = int(pupil_class_id)
+        profile.save()
+        return Response({'message': 'Pupil class updated successfully'}, status=status.HTTP_200_OK)
+    except (TypeError, ValueError):
+        return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response

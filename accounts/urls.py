@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     UserViewSet, PupilProfileViewSet, login_view, 
-    register_view, profile_view, update_profile_view
+    register_view, profile_view, update_profile_view, admin_update_user_class
 )
 
 router = DefaultRouter()
@@ -17,4 +17,5 @@ urlpatterns = [
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/profile/', profile_view, name='profile'),
     path('auth/profile/update/', update_profile_view, name='update_profile'),
+    path('admin/update-user-class/', admin_update_user_class, name='admin_update_user_class'),
 ]
