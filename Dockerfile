@@ -24,11 +24,22 @@ RUN pip install --upgrade pip && \
 # Copy project files
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Create staticfiles directory
+RUN mkdir -p staticfiles
 
 # Expose port
 EXPOSE 8000
 
-# Run gunicorn
-CMD ["gunicorn", "backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120"]
+# Create an entrypoint script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Running database migrations..."\n\
+python manage.py migrate --noinput\n\
+echo "Collecting static files..."\n\
+python manage.py collectstatic --noinput\n\
+echo "Starting Gunicorn..."\n\
+exec gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 4 --timeout 120 --access-logfile - --error-logfile -\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+# Run the entrypoint script
+CMD ["/app/entrypoint.sh"]
