@@ -27,19 +27,25 @@ COPY . .
 # Create staticfiles directory
 RUN mkdir -p staticfiles
 
+# Create entrypoint script
+COPY <<EOF /app/entrypoint.sh
+#!/bin/bash
+set -e
+
+echo "Running database migrations..."
+python manage.py migrate --noinput
+
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
+echo "Starting Gunicorn on port \${PORT:-8000}..."
+exec gunicorn backend.wsgi:application --bind 0.0.0.0:\${PORT:-8000} --workers 4 --timeout 120 --access-logfile - --error-logfile -
+EOF
+
+RUN chmod +x /app/entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Create an entrypoint script
-RUN echo '#!/bin/bash\n\
-set -e\n\
-echo "Running database migrations..."\n\
-python manage.py migrate --noinput\n\
-echo "Collecting static files..."\n\
-python manage.py collectstatic --noinput\n\
-echo "Starting Gunicorn..."\n\
-exec gunicorn backend.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 4 --timeout 120 --access-logfile - --error-logfile -\n\
-' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
 # Run the entrypoint script
-CMD ["/bin/bash", "/app/entrypoint.sh"]
+CMD ["/app/entrypoint.sh"]
