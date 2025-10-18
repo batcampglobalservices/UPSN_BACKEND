@@ -35,6 +35,8 @@ class CarouselImageViewSet(viewsets.ModelViewSet):
 
 
 class SchoolLogoViewSet(viewsets.ModelViewSet):
+    from rest_framework.parsers import MultiPartParser, FormParser
+    parser_classes = [MultiPartParser, FormParser]
     """
     ViewSet for SchoolLogo operations
     Public can view active logo
