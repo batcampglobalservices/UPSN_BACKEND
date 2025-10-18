@@ -62,14 +62,49 @@ class ResultCreateSerializer(serializers.ModelSerializer):
         model = Result
         fields = ['pupil', 'subject', 'session', 'term', 'test_score', 'exam_score', 'teacher_comment']
     
+    def validate_test_score(self, value):
+        """Validate test score"""
+        if value is None:
+            raise serializers.ValidationError("Test score is required")
+        if value < 0 or value > 30:
+            raise serializers.ValidationError("Test score must be between 0 and 30")
+        return value
+    
+    def validate_exam_score(self, value):
+        """Validate exam score"""
+        if value is None:
+            raise serializers.ValidationError("Exam score is required")
+        if value < 0 or value > 70:
+            raise serializers.ValidationError("Exam score must be between 0 and 70")
+        return value
+    
     def validate(self, attrs):
-        # Ensure test_score is between 0 and 30
-        if attrs.get('test_score') and (attrs['test_score'] < 0 or attrs['test_score'] > 30):
-            raise serializers.ValidationError({"test_score": "Test score must be between 0 and 30"})
+        # Check all required fields
+        required_fields = ['pupil', 'subject', 'session', 'term', 'test_score', 'exam_score']
+        missing_fields = []
         
-        # Ensure exam_score is between 0 and 70
-        if attrs.get('exam_score') and (attrs['exam_score'] < 0 or attrs['exam_score'] > 70):
-            raise serializers.ValidationError({"exam_score": "Exam score must be between 0 and 70"})
+        for field in required_fields:
+            if field not in attrs or attrs[field] is None:
+                missing_fields.append(field)
+        
+        if missing_fields:
+            raise serializers.ValidationError({
+                'error': f"Missing required fields: {', '.join(missing_fields)}"
+            })
+        
+        # Check for duplicate result
+        if not self.instance:  # Only for create, not update
+            existing = Result.objects.filter(
+                pupil=attrs['pupil'],
+                subject=attrs['subject'],
+                session=attrs['session'],
+                term=attrs['term']
+            ).exists()
+            
+            if existing:
+                raise serializers.ValidationError({
+                    'error': 'A result already exists for this pupil, subject, session, and term combination.'
+                })
         
         return attrs
 

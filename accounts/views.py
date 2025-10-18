@@ -34,6 +34,24 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserCreateSerializer
         return UserSerializer
     
+    def create(self, request, *args, **kwargs):
+        """Custom create to handle user creation with proper response"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Creating user with data: {request.data}")
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        logger.info(f"User created successfully: {user.username} (ID: {user.id})")
+        
+        # Return the user with UserSerializer to include all fields
+        output_serializer = UserSerializer(user)
+        headers = self.get_success_headers(output_serializer.data)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
     @action(detail=True, methods=['post'])
     def deactivate(self, request, pk=None):
         """Deactivate a user"""
@@ -49,6 +67,35 @@ class UserViewSet(viewsets.ModelViewSet):
         user.is_active = True
         user.save()
         return Response({'message': 'User activated successfully'}, status=status.HTTP_200_OK)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Custom delete with logging and cascade handling"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        user = self.get_object()
+        username = user.username
+        user_id = user.id
+        user_role = user.role
+        
+        logger.warning(f"🗑️ Deleting user: {username} (ID: {user_id}, Role: {user_role})")
+        
+        try:
+            # Django will handle cascading deletes based on model relationships
+            self.perform_destroy(user)
+            logger.info(f"✅ User {username} deleted successfully")
+            
+            return Response({
+                'message': f'User {username} deleted successfully',
+                'deleted_user_id': user_id,
+                'deleted_username': username
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"❌ Error deleting user {username}: {str(e)}")
+            return Response({
+                'error': 'Failed to delete user',
+                'detail': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PupilProfileViewSet(viewsets.ModelViewSet):
@@ -80,6 +127,26 @@ class PupilProfileViewSet(viewsets.ModelViewSet):
             # Pupils can only see their own profile
             return base_queryset.filter(user=user)
         return PupilProfile.objects.none()
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
+    def set_class(self, request, pk=None):
+        """Allow admin to set or clear the pupil's class"""
+        profile = self.get_object()
+        pupil_class_id = request.data.get('pupil_class')
+
+        # Allow clearing the class by sending empty string or null
+        if pupil_class_id in ['', None]:
+            profile.pupil_class = None
+            profile.save()
+            return Response({'message': 'Pupil class cleared successfully'}, status=status.HTTP_200_OK)
+
+        try:
+            # Accept numeric id
+            profile.pupil_class_id = int(pupil_class_id)
+            profile.save()
+            return Response({'message': 'Pupil class updated successfully'}, status=status.HTTP_200_OK)
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -170,4 +237,40 @@ def update_profile_view(request):
         'message': 'Profile updated successfully',
         'user': UserProfileSerializer(request.user).data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def set_pupil_class_view(request):
+    """Admin endpoint to set or clear a pupil's class by pupil_profile id or user id.
+
+    Accepts JSON payload: { "profile_id": <id>, "pupil_class": <class_id> }
+    If `pupil_class` is null or empty, the class will be cleared.
+    """
+    profile_id = request.data.get('profile_id')
+    user_id = request.data.get('user_id')
+    pupil_class_id = request.data.get('pupil_class')
+
+    if not profile_id and not user_id:
+        return Response({'error': 'profile_id or user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        if profile_id:
+            profile = PupilProfile.objects.get(id=profile_id)
+        else:
+            profile = PupilProfile.objects.get(user_id=user_id)
+    except PupilProfile.DoesNotExist:
+        return Response({'error': 'PupilProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if pupil_class_id in ['', None]:
+        profile.pupil_class = None
+        profile.save()
+        return Response({'message': 'Pupil class cleared successfully'}, status=status.HTTP_200_OK)
+
+    try:
+        profile.pupil_class_id = int(pupil_class_id)
+        profile.save()
+        return Response({'message': 'Pupil class updated successfully'}, status=status.HTTP_200_OK)
+    except (TypeError, ValueError):
+        return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
 

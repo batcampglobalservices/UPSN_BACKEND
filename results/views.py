@@ -96,15 +96,32 @@ class ResultViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Create a new result and auto-generate summary"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"📝 Creating result with data: {request.data}")
+        
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = serializer.save()
         
-        # Auto-generate or update result summary for this pupil, session, and term
-        self._update_result_summary(result.pupil, result.session, result.term)
+        if not serializer.is_valid():
+            logger.error(f"❌ Validation failed: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        try:
+            result = serializer.save()
+            logger.info(f"✅ Result created: Pupil {result.pupil.username}, Subject {result.subject.name}, Term {result.term}")
+            
+            # Auto-generate or update result summary for this pupil, session, and term
+            self._update_result_summary(result.pupil, result.session, result.term)
+            
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            logger.error(f"❌ Error creating result: {str(e)}")
+            return Response({
+                'error': 'Failed to create result',
+                'detail': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
     
     def update(self, request, *args, **kwargs):
         """Update result and regenerate summary"""
