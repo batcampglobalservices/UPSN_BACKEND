@@ -101,12 +101,12 @@ class SubjectViewSet(viewsets.ModelViewSet):
                 models.Q(assigned_teacher=user) | 
                 models.Q(assigned_class__assigned_teacher=user)
             ).distinct()
-        elif user.role == 'student':
-            # Students see subjects in their class
+        elif user.role == 'pupil':
+            # Pupils see subjects in their class
             try:
-                student_profile = user.student_profile
-                if student_profile.student_class:
-                    return base_queryset.filter(assigned_class=student_profile.student_class)
+                pupil_profile = user.pupil_profile
+                if pupil_profile.pupil_class:
+                    return base_queryset.filter(assigned_class=pupil_profile.pupil_class)
             except:
                 pass
         return Subject.objects.none()

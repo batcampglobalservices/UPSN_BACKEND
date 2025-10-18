@@ -8,20 +8,20 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
-from accounts.models import User
+from accounts.models import CustomUser
 from results.models import Result, ResultSummary, AcademicSession
 
 print("=" * 60)
 print("RESULT SYSTEM DIAGNOSTIC")
 print("=" * 60)
 
-# Check students
-students = User.objects.filter(role='student')
-print(f"\n📊 Total Students: {students.count()}")
-if students.exists():
-    print("\nStudent List:")
-    for student in students[:5]:  # Show first 5
-        print(f"  - ID: {student.id}, Username: {student.username}, Name: {student.full_name}")
+# Check pupils
+pupils = CustomUser.objects.filter(role='pupil')
+print(f"\n📊 Total Pupils: {pupils.count()}")
+if pupils.exists():
+    print("\nPupil List:")
+    for pupil in pupils[:5]:  # Show first 5
+        print(f"  - ID: {pupil.id}, Username: {pupil.username}, Name: {pupil.full_name}")
 
 # Check academic sessions
 sessions = AcademicSession.objects.all()
@@ -37,12 +37,12 @@ if sessions.exists():
 results = Result.objects.all()
 print(f"\n📝 Total Results: {results.count()}")
 if results.exists():
-    print("\nResult Breakdown by Student:")
-    for student in students[:5]:  # First 5 students
-        student_results = Result.objects.filter(student=student)
-        print(f"  - {student.full_name} ({student.username}): {student_results.count()} results")
-        if student_results.exists():
-            for result in student_results[:3]:  # First 3 results
+    print("\nResult Breakdown by Pupil:")
+    for pupil in pupils[:5]:  # First 5 pupils
+        pupil_results = Result.objects.filter(pupil=pupil)
+        print(f"  - {pupil.full_name} ({pupil.username}): {pupil_results.count()} results")
+        if pupil_results.exists():
+            for result in pupil_results[:3]:  # First 3 results
                 print(f"      * {result.subject.name}: Test={result.test_score}, Exam={result.exam_score}, Total={result.total}, Grade={result.grade}")
 
 # Check summaries
@@ -51,17 +51,17 @@ print(f"\n📊 Total Result Summaries: {summaries.count()}")
 if summaries.exists():
     print("\nSummary Breakdown:")
     for summary in summaries[:5]:
-        print(f"  - {summary.student.full_name}: {summary.session.name} - {summary.term}")
+        print(f"  - {summary.pupil.full_name}: {summary.session.name} - {summary.term}")
         print(f"      Subjects: {summary.total_subjects}, Avg: {summary.average_score:.2f}%, Grade: {summary.overall_grade}")
 
-# Specific test: Check first student
-if students.exists():
-    test_student = students.first()
-    print(f"\n🔍 DETAILED TEST FOR: {test_student.full_name} (ID: {test_student.id})")
-    print(f"   Role: {test_student.role}")
-    print(f"   Username: {test_student.username}")
+# Specific test: Check first pupil
+if pupils.exists():
+    test_pupil = pupils.first()
+    print(f"\n🔍 DETAILED TEST FOR: {test_pupil.full_name} (ID: {test_pupil.id})")
+    print(f"   Role: {test_pupil.role}")
+    print(f"   Username: {test_pupil.username}")
     
-    test_results = Result.objects.filter(student=test_student)
+    test_results = Result.objects.filter(pupil=test_pupil)
     print(f"   Results count: {test_results.count()}")
     
     if test_results.exists():
@@ -73,12 +73,12 @@ if students.exists():
         print(f"      - Scores: Test={r.test_score}, Exam={r.exam_score}, Total={r.total}")
         print(f"      - Grade: {r.grade}")
     else:
-        print("   ⚠️ NO RESULTS FOUND FOR THIS STUDENT")
+        print("   ⚠️ NO RESULTS FOUND FOR THIS PUPIL")
     
-    test_summaries = ResultSummary.objects.filter(student=test_student)
+    test_summaries = ResultSummary.objects.filter(pupil=test_pupil)
     print(f"   Summaries count: {test_summaries.count()}")
     if not test_summaries.exists():
-        print("   ⚠️ NO SUMMARIES FOUND FOR THIS STUDENT")
+        print("   ⚠️ NO SUMMARIES FOUND FOR THIS PUPIL")
 
 print("\n" + "=" * 60)
 print("DIAGNOSTIC COMPLETE")
@@ -86,8 +86,8 @@ print("=" * 60)
 
 # Recommendations
 print("\n💡 RECOMMENDATIONS:")
-if not students.exists():
-    print("  ❌ No students found. Create student accounts first.")
+if not pupils.exists():
+    print("  ❌ No pupils found. Create pupil accounts first.")
 elif not results.exists():
     print("  ❌ No results found. Upload scores using Score Entry.")
 elif not summaries.exists():

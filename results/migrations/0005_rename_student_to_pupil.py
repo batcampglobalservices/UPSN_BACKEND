@@ -29,20 +29,10 @@ class Migration(migrations.Migration):
             new_name='result_pupil_sess_term_idx',
             old_name='result_stud_sess_term_idx',
         ),
-        migrations.RenameIndex(
-            model_name='result',
-            new_name='result_pupil_idx',
-            old_name='result_student_idx',
-        ),
         # Rename indexes in ResultSummary
         migrations.RenameIndex(
             model_name='resultsummary',
             new_name='summary_pupil_sess_term_idx',
             old_name='summary_stud_sess_term_idx',
-        ),
-        migrations.RenameIndex(
-            model_name='resultsummary',
-            new_name='summary_pupil_idx',
-            old_name='summary_student_idx',
         ),
     ]
