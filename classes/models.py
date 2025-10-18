@@ -7,15 +7,18 @@ class Class(models.Model):
     Model for school classes (JSS1-SS3)
     """
     CLASS_CHOICES = (
-        ('JSS1', 'JSS 1'),
-        ('JSS2', 'JSS 2'),
-        ('JSS3', 'JSS 3'),
-        ('SS1', 'SS 1'),
-        ('SS2', 'SS 2'),
-        ('SS3', 'SS 3'),
+        ('JK1', 'JK1'),
+        ('JK2', 'JK2'),
+        ('JK3', 'JK3'),
+        ('SK', 'SK'),
+        ('GRADE 1', 'GRADE 1'),
+        ('GRADE 2', 'GRADE 2'),
+        ('GRADE 3', 'GRADE 3'),
+        ('GRADE 4', 'GRADE 4'),
+        ('GRADE 5', 'GRADE 5'),
     )
     
-    name = models.CharField(max_length=50, unique=True, help_text="e.g., JSS1A, SS2B")
+    name = models.CharField(max_length=50, unique=True, help_text="e.g., JK1A, GRADE 2B")
     level = models.CharField(max_length=10, choices=CLASS_CHOICES)
     assigned_teacher = models.ForeignKey(
         settings.AUTH_USER_MODEL,
