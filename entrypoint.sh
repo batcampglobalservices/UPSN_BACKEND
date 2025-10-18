@@ -60,6 +60,9 @@ PY
 echo "📦 Running database migrations..."
 python manage.py migrate --noinput
 
+echo "🛠️  Fixing class levels (auto-mapping old to new)..."
+python manage.py fix_class_levels || echo "⚠️  fix_class_levels command failed or not needed. Continuing..."
+
 echo "🎨 Collecting static files..."
 python manage.py collectstatic --noinput
 
