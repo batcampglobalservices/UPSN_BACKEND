@@ -8,7 +8,9 @@ import sys
 import django
 
 # Setup Django environment
-sys.path.append('/home/batombari/Documents/Full stack dev/backend')
+# Get the directory where this script is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 django.setup()
 
