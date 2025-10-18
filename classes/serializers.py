@@ -16,6 +16,19 @@ class SubjectSerializer(serializers.ModelSerializer):
                   'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
+    def __init__(self, *args, **kwargs):
+        """
+        Dynamically mark fields read-only for certain roles.
+        Teachers cannot change assigned_teacher; it's always themselves.
+        """
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        user = getattr(request, 'user', None)
+        if getattr(user, 'role', None) == 'teacher':
+            # Prevent teachers from attempting to set another teacher explicitly
+            if 'assigned_teacher' in self.fields:
+                self.fields['assigned_teacher'].read_only = True
+
 
 class ClassSerializer(serializers.ModelSerializer):
     """

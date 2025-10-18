@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from .models import Class, Subject
@@ -115,6 +116,47 @@ class SubjectViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         """Cached list of subjects"""
         return super().list(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        """Teachers can only create subjects for their own classes and must assign themselves."""
+        user = self.request.user
+        if getattr(user, 'role', None) == 'teacher':
+            assigned_class = serializer.validated_data.get('assigned_class')
+            if not assigned_class or assigned_class.assigned_teacher_id != user.id:
+                raise PermissionDenied('Teachers can only create subjects for classes assigned to them.')
+
+            # If assigned_teacher provided and is not the current user, block
+            provided_teacher = serializer.validated_data.get('assigned_teacher')
+            if provided_teacher and provided_teacher.id != user.id:
+                raise PermissionDenied('Teachers can only assign themselves as the subject teacher.')
+
+            serializer.save(assigned_teacher=user)
+            return
+
+        # Admins can set any fields
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """Teachers can only update subjects in their classes and cannot assign other teachers."""
+        user = self.request.user
+        if getattr(user, 'role', None) == 'teacher':
+            instance = self.get_object()
+
+            # Check class ownership: either existing or new assigned_class if provided
+            new_class = serializer.validated_data.get('assigned_class', instance.assigned_class)
+            if not new_class or new_class.assigned_teacher_id != user.id:
+                raise PermissionDenied('Teachers can only modify subjects for classes assigned to them.')
+
+            # Enforce teacher assignment to self
+            provided_teacher = serializer.validated_data.get('assigned_teacher', user)
+            if provided_teacher and provided_teacher.id != user.id:
+                raise PermissionDenied('Teachers can only assign themselves as the subject teacher.')
+
+            serializer.save(assigned_teacher=user, assigned_class=new_class)
+            return
+
+        # Admins
+        serializer.save()
 
 
 from django.db import models
