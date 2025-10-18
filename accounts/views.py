@@ -21,8 +21,12 @@ def admin_update_user_class(request):
     Admin endpoint to update a user's class (pupil_class) by user id.
     Accepts JSON: { "user_id": <user_id>, "pupil_class": <class_id or null> }
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     user_id = request.data.get('user_id')
     pupil_class_id = request.data.get('pupil_class')
+    logger.info(f"[admin_update_user_class] user={request.user.id} role={getattr(request.user, 'role', None)} payload={{'user_id': {user_id}, 'pupil_class': {pupil_class_id}}}")
     if not user_id:
         return Response({'error': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -38,11 +42,17 @@ def admin_update_user_class(request):
     if pupil_class_id in [None, '']:
         profile.pupil_class = None
         profile.save()
-        return Response({'message': 'Pupil class cleared successfully'}, status=status.HTTP_200_OK)
+    logger.info(f"[admin_update_user_class] Cleared class for user_id={user.id} profile_id={profile.id}")
+    resp = Response({'message': 'Pupil class cleared successfully', 'profile_id': profile.id, 'pupil_class': None}, status=status.HTTP_200_OK)
+    resp['Cache-Control'] = 'no-store'
+    return resp
     try:
         profile.pupil_class_id = int(pupil_class_id)
         profile.save()
-        return Response({'message': 'Pupil class updated successfully'}, status=status.HTTP_200_OK)
+    logger.info(f"[admin_update_user_class] Updated class for user_id={user.id} profile_id={profile.id} to class_id={profile.pupil_class_id}")
+    resp = Response({'message': 'Pupil class updated successfully', 'profile_id': profile.id, 'pupil_class': profile.pupil_class_id}, status=status.HTTP_200_OK)
+    resp['Cache-Control'] = 'no-store'
+    return resp
     except (TypeError, ValueError):
         return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
 from .serializers import (
@@ -169,21 +179,34 @@ class PupilProfileViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
     def set_class(self, request, pk=None):
         """Allow admin to set or clear the pupil's class"""
+        import logging
+        logger = logging.getLogger(__name__)
         profile = self.get_object()
         pupil_class_id = request.data.get('pupil_class')
+
+        logger.info(f"[set_class] user={request.user.id} role={getattr(request.user, 'role', None)} profile_id={profile.id} payload_pupil_class={pupil_class_id}")
 
         # Allow clearing the class by sending empty string or null
         if pupil_class_id in ['', None]:
             profile.pupil_class = None
             profile.save()
-            return Response({'message': 'Pupil class cleared successfully'}, status=status.HTTP_200_OK)
+            logger.info(f"[set_class] Cleared class for profile_id={profile.id}")
+            from .serializers import PupilProfileSerializer
+            resp = Response({'message': 'Pupil class cleared successfully', 'profile': PupilProfileSerializer(profile).data}, status=status.HTTP_200_OK)
+            resp['Cache-Control'] = 'no-store'
+            return resp
 
         try:
             # Accept numeric id
             profile.pupil_class_id = int(pupil_class_id)
             profile.save()
-            return Response({'message': 'Pupil class updated successfully'}, status=status.HTTP_200_OK)
+            logger.info(f"[set_class] Updated profile_id={profile.id} to class_id={profile.pupil_class_id}")
+            from .serializers import PupilProfileSerializer
+            resp = Response({'message': 'Pupil class updated successfully', 'profile': PupilProfileSerializer(profile).data}, status=status.HTTP_200_OK)
+            resp['Cache-Control'] = 'no-store'
+            return resp
         except (ValueError, TypeError):
+            logger.warning(f"[set_class] Invalid pupil_class id provided: {pupil_class_id}")
             return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
 
 
