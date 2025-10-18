@@ -1,3 +1,4 @@
+
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -7,6 +8,11 @@ from django.contrib.auth import authenticate
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from .models import CustomUser, PupilProfile
+from .serializers import (
+    UserSerializer, PupilProfileSerializer, LoginSerializer, 
+    UserCreateSerializer, UserProfileSerializer
+)
+from .permissions import IsAdmin, IsAdminOrTeacher
 
 @api_view(['POST'])
 @permission_classes([IsAdmin])
