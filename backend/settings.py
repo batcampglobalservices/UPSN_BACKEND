@@ -90,7 +90,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
-ASGI_APPLICATION = 'backend.routing.application'
+ASGI_APPLICATION = 'backend.asgi.application'
 # Channels/Redis configuration for realtime
 REDIS_URL = config('REDIS_URL', default='redis://127.0.0.1:6379')
 
