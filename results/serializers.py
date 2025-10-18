@@ -6,18 +6,14 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
     """
     Serializer for AcademicSession model
     """
-    current_term = serializers.SerializerMethodField()
+    current_term = serializers.CharField()
     
     class Meta:
         model = AcademicSession
         fields = ['id', 'name', 'start_date', 'end_date', 'is_active', 'result_release_date', 'current_term', 'created_at']
         read_only_fields = ['id', 'created_at']
     
-    def get_current_term(self, obj):
-        """Return a default term value for display"""
-        # You can implement logic to determine current term based on dates
-        # For now, returning a default value
-        return 'First Term'
+    # Removed get_current_term; now returns actual value
 
 
 class ResultSerializer(serializers.ModelSerializer):
