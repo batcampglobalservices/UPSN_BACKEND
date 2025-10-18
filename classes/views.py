@@ -112,9 +112,11 @@ class SubjectViewSet(viewsets.ModelViewSet):
                 pass
         return Subject.objects.none()
     
-    @method_decorator(cache_page(180))  # Cache for 3 minutes
     def list(self, request, *args, **kwargs):
-        """Cached list of subjects"""
+        """
+        List subjects without caching to ensure real-time visibility
+        for score entry and subject management
+        """
         return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
