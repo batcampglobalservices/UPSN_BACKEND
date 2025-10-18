@@ -1,3 +1,13 @@
+from rest_framework import viewsets, status, generics
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+from .models import CustomUser, PupilProfile
+
 @api_view(['POST'])
 @permission_classes([IsAdmin])
 def admin_update_user_class(request):
@@ -29,15 +39,6 @@ def admin_update_user_class(request):
         return Response({'message': 'Pupil class updated successfully'}, status=status.HTTP_200_OK)
     except (TypeError, ValueError):
         return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
-from rest_framework import viewsets, status, generics
-from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
-from django.views.decorators.cache import cache_page
-from django.utils.decorators import method_decorator
-from .models import CustomUser, PupilProfile
 from .serializers import (
     UserSerializer, PupilProfileSerializer, LoginSerializer, 
     UserCreateSerializer, UserProfileSerializer
