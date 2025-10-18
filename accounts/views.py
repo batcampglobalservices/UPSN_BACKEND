@@ -42,24 +42,28 @@ def admin_update_user_class(request):
     if pupil_class_id in [None, '']:
         profile.pupil_class = None
         profile.save()
-    logger.info(f"[admin_update_user_class] Cleared class for user_id={user.id} profile_id={profile.id}")
-    resp = Response({'message': 'Pupil class cleared successfully', 'profile_id': profile.id, 'pupil_class': None}, status=status.HTTP_200_OK)
-    resp['Cache-Control'] = 'no-store'
-    return resp
+        logger.info(f"[admin_update_user_class] Cleared class for user_id={user.id} profile_id={profile.id}")
+        resp = Response({
+            'message': 'Pupil class cleared successfully',
+            'profile_id': profile.id,
+            'pupil_class': None
+        }, status=status.HTTP_200_OK)
+        resp['Cache-Control'] = 'no-store'
+        return resp
+
     try:
         profile.pupil_class_id = int(pupil_class_id)
         profile.save()
-    logger.info(f"[admin_update_user_class] Updated class for user_id={user.id} profile_id={profile.id} to class_id={profile.pupil_class_id}")
-    resp = Response({'message': 'Pupil class updated successfully', 'profile_id': profile.id, 'pupil_class': profile.pupil_class_id}, status=status.HTTP_200_OK)
-    resp['Cache-Control'] = 'no-store'
-    return resp
+        logger.info(f"[admin_update_user_class] Updated class for user_id={user.id} profile_id={profile.id} to class_id={profile.pupil_class_id}")
+        resp = Response({
+            'message': 'Pupil class updated successfully',
+            'profile_id': profile.id,
+            'pupil_class': profile.pupil_class_id
+        }, status=status.HTTP_200_OK)
+        resp['Cache-Control'] = 'no-store'
+        return resp
     except (TypeError, ValueError):
         return Response({'error': 'Invalid pupil_class id'}, status=status.HTTP_400_BAD_REQUEST)
-from .serializers import (
-    UserSerializer, PupilProfileSerializer, LoginSerializer, 
-    UserCreateSerializer, UserProfileSerializer
-)
-from .permissions import IsAdmin, IsAdminOrTeacher
 
 
 class UserViewSet(viewsets.ModelViewSet):
