@@ -18,15 +18,14 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install gunicorn psycopg2-binary
-
-# Copy entrypoint script first
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .
+
+# Copy entrypoint last and ensure it's executable
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
