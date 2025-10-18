@@ -56,9 +56,8 @@ def generate_result_pdf(result_summary):
     except:
         pass
     
-    # School name and title
-    elements.append(Paragraph("SCHOOL NAME", title_style))
-    elements.append(Paragraph("PUPIL RESULT SHEET", heading_style))
+    # School name (customized) and spacing
+    elements.append(Paragraph("University of Nigeria Primary School Nsukka", title_style))
     elements.append(Spacer(1, 12))
     
     # Pupil information

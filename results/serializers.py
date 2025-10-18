@@ -10,7 +10,7 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = AcademicSession
-        fields = ['id', 'name', 'start_date', 'end_date', 'is_active', 'result_release_date', 'current_term', 'created_at']
+        fields = ['id', 'name', 'start_date', 'end_date', 'is_active', 'result_release_date', 'results_unlocked', 'current_term', 'created_at']
         read_only_fields = ['id', 'created_at']
     
     # Removed get_current_term; now returns actual value

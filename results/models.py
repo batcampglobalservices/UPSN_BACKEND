@@ -28,6 +28,10 @@ class AcademicSession(models.Model):
         blank=True,
         help_text="Date and time when results will be released to pupils"
     )
+    results_unlocked = models.BooleanField(
+        default=False,
+        help_text="If true, pupils can view results immediately regardless of release date"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

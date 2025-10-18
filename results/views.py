@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import HttpResponse
 from django.db.models import Q
+from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from .models import Result, AcademicSession, ResultSummary
@@ -28,13 +29,11 @@ class AcademicSessionViewSet(viewsets.ModelViewSet):
             return [IsAdmin()]
         return [IsAuthenticated()]
     
-    @method_decorator(cache_page(300))  # Cache for 5 minutes
     def list(self, request, *args, **kwargs):
-        """Cached list of academic sessions"""
+        """List academic sessions (no cache to reflect immediate unlock changes)"""
         return super().list(request, *args, **kwargs)
     
     @action(detail=False, methods=['get'])
-    @method_decorator(cache_page(300))  # Cache for 5 minutes
     def active(self, request):
         """Get the active academic session"""
         active_session = AcademicSession.objects.filter(is_active=True).first()
@@ -42,6 +41,28 @@ class AcademicSessionViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(active_session)
             return Response(serializer.data)
         return Response({'error': 'No active session found'}, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=True, methods=['post'])
+    def unlock_results(self, request, pk=None):
+        """Admin-only: Unlock results for this session regardless of release date"""
+        if not request.user.is_authenticated or request.user.role != 'admin':
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        session = self.get_object()
+        session.results_unlocked = True
+        session.save(update_fields=['results_unlocked'])
+        serializer = self.get_serializer(session)
+        return Response({'message': 'Results unlocked for this session', 'session': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    def lock_results(self, request, pk=None):
+        """Admin-only: Re-lock results for this session"""
+        if not request.user.is_authenticated or request.user.role != 'admin':
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        session = self.get_object()
+        session.results_unlocked = False
+        session.save(update_fields=['results_unlocked'])
+        serializer = self.get_serializer(session)
+        return Response({'message': 'Results locked for this session', 'session': serializer.data})
 
 
 class ResultViewSet(viewsets.ModelViewSet):
@@ -83,8 +104,13 @@ class ResultViewSet(viewsets.ModelViewSet):
                 pupil__pupil_profile__pupil_class__in=teacher_classes
             )
         elif user.role == 'pupil':
-            # Pupils can only see their own results
-            return base_queryset.filter(pupil=user)
+            # Pupils can only see their own results and only released sessions
+            qs = base_queryset.filter(pupil=user)
+            active_session = AcademicSession.objects.filter(is_active=True).first()
+            if active_session and not active_session.results_unlocked and active_session.result_release_date:
+                if timezone.now() < active_session.result_release_date:
+                    qs = qs.exclude(session=active_session)
+            return qs
         return Result.objects.none()
     
     def get_permissions(self):
@@ -214,6 +240,12 @@ class ResultViewSet(viewsets.ModelViewSet):
             results = results.filter(session_id=session_id)
         if term:
             results = results.filter(term=term)
+
+        # Server-side gating: hide active session results if locked and not manually unlocked
+        active_session = AcademicSession.objects.filter(is_active=True).first()
+        if active_session and not active_session.results_unlocked and active_session.result_release_date:
+            if timezone.now() < active_session.result_release_date:
+                results = results.exclude(session=active_session)
         
         serializer = self.get_serializer(results, many=True)
         return Response(serializer.data)
@@ -248,7 +280,13 @@ class ResultSummaryViewSet(viewsets.ModelViewSet):
                 pupil__pupil_profile__pupil_class__in=teacher_classes
             )
         elif user.role == 'pupil':
-            return base_queryset.filter(pupil=user)
+            qs = base_queryset.filter(pupil=user)
+            # Hide active session summaries if locked and not manually unlocked
+            active_session = AcademicSession.objects.filter(is_active=True).first()
+            if active_session and not active_session.results_unlocked and active_session.result_release_date:
+                if timezone.now() < active_session.result_release_date:
+                    qs = qs.exclude(session=active_session)
+            return qs
         return ResultSummary.objects.none()
     
     def get_permissions(self):
@@ -268,6 +306,15 @@ class ResultSummaryViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         """Generate and download result PDF"""
         summary = self.get_object()
+
+        # Permission check for pupils and release gating
+        user = request.user
+        if user.role == 'pupil':
+            if summary.pupil_id != user.id:
+                return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+            session = summary.session
+            if not session.results_unlocked and session.result_release_date and timezone.now() < session.result_release_date:
+                return Response({'detail': 'Results are not yet released'}, status=status.HTTP_403_FORBIDDEN)
         
         # Generate PDF
         pdf_buffer = generate_result_pdf(summary)
