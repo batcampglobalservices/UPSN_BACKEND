@@ -51,6 +51,16 @@ class AcademicSessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
         session.results_unlocked = True
         session.save(update_fields=['results_unlocked'])
+        
+        # Broadcast to all connected students that results are now available
+        broadcast_update('results_released', {
+            'action': 'unlock',
+            'session_id': session.id,
+            'session_name': session.name,
+            'term': session.current_term,
+            'message': f'Results for {session.name} have been released!'
+        })
+        
         serializer = self.get_serializer(session)
         return Response({'message': 'Results unlocked for this session', 'session': serializer.data})
 
@@ -62,6 +72,16 @@ class AcademicSessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
         session.results_unlocked = False
         session.save(update_fields=['results_unlocked'])
+        
+        # Broadcast to all connected students that results are now locked
+        broadcast_update('results_locked', {
+            'action': 'lock',
+            'session_id': session.id,
+            'session_name': session.name,
+            'term': session.current_term,
+            'message': f'Results for {session.name} have been locked by admin.'
+        })
+        
         serializer = self.get_serializer(session)
         return Response({'message': 'Results locked for this session', 'session': serializer.data})
 
@@ -135,6 +155,22 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
+            # Permission: Teachers can only create for pupils in their assigned classes
+            user = request.user
+            if getattr(user, 'role', None) == 'teacher':
+                pupil = serializer.validated_data.get('pupil')
+                subject = serializer.validated_data.get('subject')
+                # Validate pupil has a class
+                pupil_class = getattr(getattr(pupil, 'pupil_profile', None), 'pupil_class', None)
+                if not pupil_class:
+                    return Response({'detail': 'Pupil is not assigned to any class.'}, status=status.HTTP_400_BAD_REQUEST)
+                # Check class is assigned to this teacher
+                if getattr(pupil_class, 'assigned_teacher_id', None) != user.id:
+                    return Response({'detail': 'You can only upload scores for pupils in your assigned classes.'}, status=status.HTTP_403_FORBIDDEN)
+                # Ensure subject belongs to pupil's class
+                if subject.assigned_class_id != pupil_class.id:
+                    return Response({'detail': 'Selected subject does not belong to the pupil’s class.'}, status=status.HTTP_400_BAD_REQUEST)
+
             result = serializer.save()
             broadcast_update('score_update', {'action': 'create', 'result_id': result.id})
             logger.info(f"✅ Result created: Pupil {result.pupil.username}, Subject {result.subject.name}, Term {result.term}")
@@ -157,17 +193,33 @@ class ResultViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        # Permission: Teachers can only update results for pupils in their assigned classes
+        user = request.user
+        if getattr(user, 'role', None) == 'teacher':
+            # Determine final pupil and subject after update
+            final_pupil = serializer.validated_data.get('pupil', instance.pupil)
+            final_subject = serializer.validated_data.get('subject', instance.subject)
+            pupil_class = getattr(getattr(final_pupil, 'pupil_profile', None), 'pupil_class', None)
+            if not pupil_class:
+                return Response({'detail': 'Pupil is not assigned to any class.'}, status=status.HTTP_400_BAD_REQUEST)
+            if getattr(pupil_class, 'assigned_teacher_id', None) != user.id:
+                return Response({'detail': 'You can only edit scores for pupils in your assigned classes.'}, status=status.HTTP_403_FORBIDDEN)
+            if final_subject.assigned_class_id != pupil_class.id:
+                return Response({'detail': 'Selected subject does not belong to the pupil’s class.'}, status=status.HTTP_400_BAD_REQUEST)
+
         result = serializer.save()
         broadcast_update('score_update', {'action': 'update', 'result_id': result.id})
-        def perform_destroy(self, instance):
-            result_id = instance.id
-            instance.delete()
-            broadcast_update('score_update', {'action': 'delete', 'result_id': result_id})
         
         # Regenerate result summary
         self._update_result_summary(result.pupil, result.session, result.term)
         
         return Response(serializer.data)
+    
+        def perform_destroy(self, instance):
+            """Delete result and broadcast update"""
+            result_id = instance.id
+            instance.delete()
+            broadcast_update('score_update', {'action': 'delete', 'result_id': result_id})
     
     def _update_result_summary(self, pupil, session, term):
         """Generate or update result summary for a pupil"""
@@ -177,6 +229,16 @@ class ResultViewSet(viewsets.ModelViewSet):
             term=term
         )
         summary.calculate_summary()
+
+        # Broadcast summary update to notify students
+        broadcast_update('summary_update', {
+            'action': 'calculate',
+            'pupil_id': pupil.id,
+            'session_id': session.id,
+            'term': term,
+            'summary_id': summary.id
+        })
+
         return summary
     
     @action(detail=False, methods=['post'])
@@ -190,12 +252,33 @@ class ResultViewSet(viewsets.ModelViewSet):
         subject = serializer.validated_data['subject']
         results_data = serializer.validated_data['results']
         
+        # Permission: Teachers can only upload for their assigned class
+        user = request.user
+        if getattr(user, 'role', None) == 'teacher':
+            assigned_class = getattr(subject, 'assigned_class', None)
+            if not assigned_class or getattr(assigned_class, 'assigned_teacher_id', None) != user.id:
+                return Response({'detail': 'You can only upload scores for subjects in your assigned classes.'}, status=status.HTTP_403_FORBIDDEN)
+        
         created_results = []
         errors = []
         pupils_to_update = set()
         
         for result_data in results_data:
             try:
+                # Validate each pupil belongs to the subject's class and teacher owns the class
+                pupil_id = result_data.get('pupil_id')
+                from accounts.models import CustomUser
+                pupil = CustomUser.objects.filter(id=pupil_id, role='pupil').select_related('pupil_profile__pupil_class').first()
+                if not pupil:
+                    raise Exception('Invalid pupil_id')
+                pupil_class = getattr(getattr(pupil, 'pupil_profile', None), 'pupil_class', None)
+                if not pupil_class:
+                    raise Exception('Pupil has no assigned class')
+                if subject.assigned_class_id != pupil_class.id:
+                    raise Exception('Subject does not belong to pupil’s class')
+                if getattr(user, 'role', None) == 'teacher' and getattr(pupil_class, 'assigned_teacher_id', None) != user.id:
+                    raise Exception('You can only upload scores for pupils in your assigned classes')
+
                 result, created = Result.objects.update_or_create(
                     pupil_id=result_data['pupil_id'],
                     subject=subject,
