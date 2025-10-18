@@ -14,6 +14,7 @@ from .serializers import (
 )
 from accounts.permissions import IsAdmin, IsAdminOrTeacher, IsPupil
 from .utils import generate_result_pdf
+from backend.realtime import broadcast_update
 
 
 class AcademicSessionViewSet(viewsets.ModelViewSet):
@@ -135,6 +136,7 @@ class ResultViewSet(viewsets.ModelViewSet):
         
         try:
             result = serializer.save()
+            broadcast_update('score_update', {'action': 'create', 'result_id': result.id})
             logger.info(f"✅ Result created: Pupil {result.pupil.username}, Subject {result.subject.name}, Term {result.term}")
             
             # Auto-generate or update result summary for this pupil, session, and term
@@ -156,6 +158,11 @@ class ResultViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         result = serializer.save()
+        broadcast_update('score_update', {'action': 'update', 'result_id': result.id})
+        def perform_destroy(self, instance):
+            result_id = instance.id
+            instance.delete()
+            broadcast_update('score_update', {'action': 'delete', 'result_id': result_id})
         
         # Regenerate result summary
         self._update_result_summary(result.pupil, result.session, result.term)

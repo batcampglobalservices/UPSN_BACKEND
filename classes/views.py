@@ -10,7 +10,23 @@ from .serializers import ClassSerializer, ClassListSerializer, SubjectSerializer
 from accounts.permissions import IsAdmin, IsAdminOrTeacher
 
 
+from backend.realtime import broadcast_update
+
 class ClassViewSet(viewsets.ModelViewSet):
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        broadcast_update('class_update', {'action': 'create', 'class_id': instance.id})
+        return instance
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        broadcast_update('class_update', {'action': 'update', 'class_id': instance.id})
+        return instance
+
+    def perform_destroy(self, instance):
+        class_id = instance.id
+        instance.delete()
+        broadcast_update('class_update', {'action': 'delete', 'class_id': class_id})
     """
     ViewSet for Class CRUD operations
     Admin: Full access
@@ -55,7 +71,7 @@ class ClassViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         """Cached list of classes"""
         return super().list(request, *args, **kwargs)
-    
+
     @action(detail=True, methods=['get'])
     def pupils(self, request, pk=None):
         """Get all pupils in a class"""
@@ -66,8 +82,71 @@ class ClassViewSet(viewsets.ModelViewSet):
         serializer = PupilProfileSerializer(pupils, many=True)
         return Response(serializer.data)
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        broadcast_update('class_update', {'action': 'create', 'class_id': instance.id})
+        return instance
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        broadcast_update('class_update', {'action': 'update', 'class_id': instance.id})
+        return instance
+
+    def perform_destroy(self, instance):
+        class_id = instance.id
+        instance.delete()
+        broadcast_update('class_update', {'action': 'delete', 'class_id': class_id})
+
 
 class SubjectViewSet(viewsets.ModelViewSet):
+    def perform_create(self, serializer):
+        user = self.request.user
+        if getattr(user, 'role', None) == 'teacher':
+            assigned_class = serializer.validated_data.get('assigned_class')
+            if not assigned_class or assigned_class.assigned_teacher_id != user.id:
+                raise PermissionDenied('Teachers can only create subjects for classes assigned to them.')
+
+            provided_teacher = serializer.validated_data.get('assigned_teacher')
+            if provided_teacher and provided_teacher.id != user.id:
+                raise PermissionDenied('Teachers can only assign themselves as the subject teacher.')
+
+            instance = serializer.save(assigned_teacher=user)
+            from backend.realtime import broadcast_update
+            broadcast_update('subject_update', {'action': 'create', 'subject_id': instance.id})
+            return instance
+
+        instance = serializer.save()
+        from backend.realtime import broadcast_update
+        broadcast_update('subject_update', {'action': 'create', 'subject_id': instance.id})
+        return instance
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if getattr(user, 'role', None) == 'teacher':
+            instance = self.get_object()
+            new_class = serializer.validated_data.get('assigned_class', instance.assigned_class)
+            if not new_class or new_class.assigned_teacher_id != user.id:
+                raise PermissionDenied('Teachers can only modify subjects for classes assigned to them.')
+
+            provided_teacher = serializer.validated_data.get('assigned_teacher', user)
+            if provided_teacher and provided_teacher.id != user.id:
+                raise PermissionDenied('Teachers can only assign themselves as the subject teacher.')
+
+            instance = serializer.save(assigned_teacher=user, assigned_class=new_class)
+            from backend.realtime import broadcast_update
+            broadcast_update('subject_update', {'action': 'update', 'subject_id': instance.id})
+            return instance
+
+        instance = serializer.save()
+        from backend.realtime import broadcast_update
+        broadcast_update('subject_update', {'action': 'update', 'subject_id': instance.id})
+        return instance
+
+    def perform_destroy(self, instance):
+        subject_id = instance.id
+        instance.delete()
+        from backend.realtime import broadcast_update
+        broadcast_update('subject_update', {'action': 'delete', 'subject_id': subject_id})
     """
     ViewSet for Subject CRUD operations
     Admin: Full access
