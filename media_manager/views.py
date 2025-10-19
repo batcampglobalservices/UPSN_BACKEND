@@ -2,9 +2,14 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.db import DatabaseError
+import logging
+
 from .models import CarouselImage, SchoolLogo, SiteSetting
 from .serializers import CarouselImageSerializer, SchoolLogoSerializer, SiteSettingSerializer
 from accounts.permissions import IsAdmin
+
+logger = logging.getLogger(__name__)
 
 
 class CarouselImageViewSet(viewsets.ModelViewSet):
@@ -78,9 +83,43 @@ class SiteSettingViewSet(viewsets.ModelViewSet):
         key = request.query_params.get('key')
         if not key:
             return Response({'error': 'key query param required'}, status=400)
-        setting = SiteSetting.objects.filter(key=key).first()
+        try:
+            setting = SiteSetting.objects.filter(key=key).first()
+        except DatabaseError as exc:
+            # Common in deployments where migrations haven't been run yet (missing table)
+            logger.exception("Database error when fetching SiteSetting for key=%s", key)
+            return Response({'error': 'database_error', 'detail': 'SiteSetting table may not exist yet'}, status=503)
+
         if not setting:
             return Response({'key': key, 'value': {}}, status=200)
         serializer = self.get_serializer(setting)
         return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except DatabaseError:
+            logger.exception("Database error while creating SiteSetting")
+            return Response({'error': 'database_error', 'detail': 'Could not save site setting (database error).'}, status=503)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            return super().update(request, *args, **kwargs)
+        except DatabaseError:
+            logger.exception("Database error while updating SiteSetting")
+            return Response({'error': 'database_error', 'detail': 'Could not update site setting (database error).'}, status=503)
+
+    def partial_update(self, request, *args, **kwargs):
+        try:
+            return super().partial_update(request, *args, **kwargs)
+        except DatabaseError:
+            logger.exception("Database error while partially updating SiteSetting")
+            return Response({'error': 'database_error', 'detail': 'Could not update site setting (database error).'}, status=503)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except DatabaseError:
+            logger.exception("Database error while deleting SiteSetting")
+            return Response({'error': 'database_error', 'detail': 'Could not delete site setting (database error).'}, status=503)
 
