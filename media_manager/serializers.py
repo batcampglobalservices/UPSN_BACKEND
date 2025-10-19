@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import CarouselImage, SchoolLogo
+from .models import SiteSetting
 
 
 class CarouselImageSerializer(serializers.ModelSerializer):
@@ -41,3 +42,10 @@ class SchoolLogoSerializer(serializers.ModelSerializer):
         elif obj.logo:
             return obj.logo.url
         return None
+
+
+class SiteSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteSetting
+        fields = ['id', 'key', 'value', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']

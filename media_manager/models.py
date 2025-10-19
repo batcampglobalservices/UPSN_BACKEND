@@ -40,3 +40,20 @@ class SchoolLogo(models.Model):
     
     class Meta:
         ordering = ['-uploaded_at']
+
+
+class SiteSetting(models.Model):
+    """
+    Simple key/value settings for the site (currently used for theme).
+    Only one setting row per key is expected.
+    """
+    key = models.CharField(max_length=100, unique=True)
+    value = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.key
+
+    class Meta:
+        ordering = ['key']

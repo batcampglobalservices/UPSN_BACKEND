@@ -2,8 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from .models import CarouselImage, SchoolLogo
-from .serializers import CarouselImageSerializer, SchoolLogoSerializer
+from .models import CarouselImage, SchoolLogo, SiteSetting
+from .serializers import CarouselImageSerializer, SchoolLogoSerializer, SiteSettingSerializer
 from accounts.permissions import IsAdmin
 
 
@@ -58,4 +58,26 @@ class SchoolLogoViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(logo)
             return Response(serializer.data)
         return Response({'error': 'No active logo found'}, status=status.HTTP_404_NOT_FOUND)
+
+class SiteSettingViewSet(viewsets.ModelViewSet):
+    """Simple API for site settings. Admin-only for create/update/delete."""
+    queryset = SiteSetting.objects.all()
+    serializer_class = SiteSettingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+
+    @action(detail=False, methods=['get'])
+    def get_by_key(self, request):
+        key = request.query_params.get('key')
+        if not key:
+            return Response({'error': 'key query param required'}, status=400)
+        setting = SiteSetting.objects.filter(key=key).first()
+        if not setting:
+            return Response({'key': key, 'value': {}}, status=200)
+        serializer = self.get_serializer(setting)
+        return Response(serializer.data)
 

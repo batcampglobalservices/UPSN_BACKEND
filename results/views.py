@@ -349,6 +349,7 @@ class ResultSummaryViewSet(viewsets.ModelViewSet):
     serializer_class = ResultSummarySerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ['pupil', 'session', 'term']
+    search_fields = ['pupil__full_name', 'pupil__username', 'pupil__email']
     
     def get_queryset(self):
         user = self.request.user

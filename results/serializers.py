@@ -20,7 +20,7 @@ class ResultSerializer(serializers.ModelSerializer):
     """
     Serializer for Result model
     """
-    pupil_name = serializers.CharField(source='pupil.full_name', read_only=True)
+    pupil_name = serializers.SerializerMethodField()
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     session_name = serializers.CharField(source='session.name', read_only=True)
     pupil_class = serializers.SerializerMethodField()
@@ -36,6 +36,15 @@ class ResultSerializer(serializers.ModelSerializer):
         try:
             return obj.pupil.pupil_profile.pupil_class.name
         except:
+            return None
+
+    def get_pupil_name(self, obj):
+        try:
+            full = getattr(obj.pupil, 'full_name', None)
+            if full:
+                return full
+            return obj.pupil.username
+        except Exception:
             return None
     
     def validate(self, attrs):
@@ -109,7 +118,7 @@ class ResultSummarySerializer(serializers.ModelSerializer):
     """
     Serializer for ResultSummary model
     """
-    pupil_name = serializers.CharField(source='pupil.full_name', read_only=True)
+    pupil_name = serializers.SerializerMethodField()
     session_name = serializers.CharField(source='session.name', read_only=True)
     pupil_class = serializers.SerializerMethodField()
     results = serializers.SerializerMethodField()
@@ -126,6 +135,15 @@ class ResultSummarySerializer(serializers.ModelSerializer):
         try:
             return obj.pupil.pupil_profile.pupil_class.name
         except:
+            return None
+
+    def get_pupil_name(self, obj):
+        try:
+            full = getattr(obj.pupil, 'full_name', None)
+            if full:
+                return full
+            return obj.pupil.username
+        except Exception:
             return None
     
     def get_results(self, obj):
