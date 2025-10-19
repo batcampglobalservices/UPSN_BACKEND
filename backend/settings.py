@@ -115,14 +115,20 @@ DATABASE_URL = config('DATABASE_URL', default=None)
 
 if DATABASE_URL:
     # Railway/Production: Use DATABASE_URL
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True,
-        )
-    }
+    # If DATABASE_URL points to sqlite, avoid ssl and postgres-specific options
+    if DATABASE_URL.startswith('sqlite'):
+        DATABASES = {
+            'default': dj_database_url.parse(DATABASE_URL)
+        }
+    else:
+        DATABASES = {
+            'default': dj_database_url.config(
+                default=DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+                ssl_require=True,
+            )
+        }
 else:
     # Local development: Use individual database settings
     DATABASES = {
