@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.db.models import Q
 from django.utils import timezone
@@ -166,7 +167,7 @@ class ResultViewSet(viewsets.ModelViewSet):
                     return Response({'detail': 'Pupil is not assigned to any class.'}, status=status.HTTP_400_BAD_REQUEST)
                 # Check class is assigned to this teacher
                 if getattr(pupil_class, 'assigned_teacher_id', None) != user.id:
-                    return Response({'detail': 'You can only upload scores for pupils in your assigned classes.'}, status=status.HTTP_403_FORBIDDEN)
+                    raise PermissionDenied('You can only upload scores for pupils in your assigned classes.')
                 # Ensure subject belongs to pupil's class
                 if subject.assigned_class_id != pupil_class.id:
                     return Response({'detail': 'Selected subject does not belong to the pupil’s class.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -257,7 +258,7 @@ class ResultViewSet(viewsets.ModelViewSet):
         if getattr(user, 'role', None) == 'teacher':
             assigned_class = getattr(subject, 'assigned_class', None)
             if not assigned_class or getattr(assigned_class, 'assigned_teacher_id', None) != user.id:
-                return Response({'detail': 'You can only upload scores for subjects in your assigned classes.'}, status=status.HTTP_403_FORBIDDEN)
+                raise PermissionDenied('You can only upload scores for subjects in your assigned classes.')
         
         created_results = []
         errors = []

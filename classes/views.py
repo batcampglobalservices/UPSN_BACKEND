@@ -74,6 +74,11 @@ class ClassViewSet(viewsets.ModelViewSet):
         """Get all pupils in a class"""
         class_obj = self.get_object()
         from accounts.serializers import PupilProfileSerializer
+        # Enforce teacher scoping: teachers can only fetch pupils for classes they manage
+        user = request.user
+        if getattr(user, 'role', None) == 'teacher' and class_obj.assigned_teacher_id != user.id:
+            raise PermissionDenied('You can only view pupils for classes assigned to you.')
+
         # Optimize pupil query with select_related
         pupils = class_obj.pupils.select_related('user').all()
         serializer = PupilProfileSerializer(pupils, many=True)
