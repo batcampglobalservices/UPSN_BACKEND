@@ -66,6 +66,9 @@ class SiteSettingViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
+        # Allow anonymous read access so the public frontend can fetch theme settings
+        if self.action in ['list', 'retrieve', 'get_by_key']:
+            return [AllowAny()]
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAdmin()]
         return [IsAuthenticated()]
