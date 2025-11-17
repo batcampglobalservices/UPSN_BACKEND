@@ -17,16 +17,15 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install daphne
 
-# Copy project files
-COPY . .
+# Copy backend project files (Docker context root is repo root)
+COPY backend/ /app/
 
-# Copy entrypoint last and ensure it's executable
-COPY entrypoint.sh /app/entrypoint.sh
+# Ensure entrypoint is executable
 RUN chmod +x /app/entrypoint.sh
 
 # Create staticfiles and media directories
