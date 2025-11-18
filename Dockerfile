@@ -16,14 +16,16 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY backend/requirements.txt ./requirements.txt
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install daphne
+# Copy project files (works whether build context is repo root or backend directory)
+COPY . .
 
-# Copy backend project files (Docker context root is repo root)
-COPY backend/ /app/
+# Install Python dependencies from whichever requirements file is available
+RUN pip install --upgrade pip && \
+    if [ -f backend/requirements.txt ]; then \
+        pip install --no-cache-dir -r backend/requirements.txt; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 # Ensure entrypoint is executable
 RUN chmod +x /app/entrypoint.sh
