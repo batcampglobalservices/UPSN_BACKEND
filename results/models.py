@@ -32,6 +32,10 @@ class AcademicSession(models.Model):
         default=False,
         help_text="If true, pupils can view results immediately regardless of release date"
     )
+    teacher_upload_enabled = models.BooleanField(
+        default=True,
+        help_text="If false, teachers cannot upload/edit results for this session"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):

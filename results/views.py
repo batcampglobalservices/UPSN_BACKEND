@@ -86,6 +86,83 @@ class AcademicSessionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(session)
         return Response({'message': 'Results locked for this session', 'session': serializer.data})
 
+    @action(detail=True, methods=['post'])
+    def enable_teacher_upload(self, request, pk=None):
+        """Admin-only: Enable teacher result uploads for this session"""
+        if not request.user.is_authenticated or request.user.role != 'admin':
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        session = self.get_object()
+        session.teacher_upload_enabled = True
+        session.save(update_fields=['teacher_upload_enabled'])
+        
+        # Broadcast to all connected teachers
+        broadcast_update('session_update', {
+            'action': 'teacher_upload_enabled',
+            'session_id': session.id,
+            'session_name': session.name,
+            'current_term': session.current_term,
+            'teacher_upload_enabled': True,
+            'message': f'Result uploads enabled for {session.name}'
+        })
+        
+        serializer = self.get_serializer(session)
+        return Response({'message': 'Teacher uploads enabled', 'session': serializer.data})
+
+    @action(detail=True, methods=['post'])
+    def disable_teacher_upload(self, request, pk=None):
+        """Admin-only: Disable teacher result uploads for this session"""
+        if not request.user.is_authenticated or request.user.role != 'admin':
+            return Response({'detail': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        session = self.get_object()
+        session.teacher_upload_enabled = False
+        session.save(update_fields=['teacher_upload_enabled'])
+        
+        # Broadcast to all connected teachers
+        broadcast_update('session_update', {
+            'action': 'teacher_upload_disabled',
+            'session_id': session.id,
+            'session_name': session.name,
+            'current_term': session.current_term,
+            'teacher_upload_enabled': False,
+            'message': f'Result uploads disabled for {session.name}'
+        })
+        
+        serializer = self.get_serializer(session)
+        return Response({'message': 'Teacher uploads disabled', 'session': serializer.data})
+
+    def perform_update(self, serializer):
+        """Broadcast session changes (e.g., term changes) in realtime"""
+        old_instance = self.get_object()
+        old_term = old_instance.current_term
+        old_upload_enabled = old_instance.teacher_upload_enabled
+        
+        instance = serializer.save()
+        
+        # Broadcast if term changed
+        if instance.current_term != old_term:
+            broadcast_update('session_update', {
+                'action': 'term_changed',
+                'session_id': instance.id,
+                'session_name': instance.name,
+                'old_term': old_term,
+                'new_term': instance.current_term,
+                'teacher_upload_enabled': instance.teacher_upload_enabled,
+                'message': f'Active term changed to {instance.get_current_term_display()}'
+            })
+        
+        # Broadcast if upload permission changed
+        if instance.teacher_upload_enabled != old_upload_enabled:
+            broadcast_update('session_update', {
+                'action': 'teacher_upload_changed',
+                'session_id': instance.id,
+                'session_name': instance.name,
+                'current_term': instance.current_term,
+                'teacher_upload_enabled': instance.teacher_upload_enabled,
+                'message': f'Result uploads {"enabled" if instance.teacher_upload_enabled else "disabled"}'
+            })
+        
+        return instance
+
 
 class ResultViewSet(viewsets.ModelViewSet):
     """
@@ -156,8 +233,29 @@ class ResultViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # Permission: Teachers can only create for pupils in their assigned classes
             user = request.user
+            session = serializer.validated_data.get('session')
+            term = serializer.validated_data.get('term')
+            
+            # Check if teachers are allowed to upload
+            if getattr(user, 'role', None) == 'teacher':
+                if not session.teacher_upload_enabled:
+                    return Response({
+                        'detail': 'Result uploads are currently disabled by admin.',
+                        'error': 'upload_disabled'
+                    }, status=status.HTTP_403_FORBIDDEN)
+                
+                # Check if uploading to active term
+                active_session = AcademicSession.objects.filter(is_active=True).first()
+                if active_session and session.id == active_session.id:
+                    if term != active_session.current_term:
+                        return Response({
+                            'detail': f'You can only upload results to the active term ({active_session.get_current_term_display()}). Selected term: {term}',
+                            'error': 'inactive_term',
+                            'active_term': active_session.current_term
+                        }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Permission: Teachers can only create for pupils in their assigned classes
             if getattr(user, 'role', None) == 'teacher':
                 pupil = serializer.validated_data.get('pupil')
                 subject = serializer.validated_data.get('subject')
@@ -194,8 +292,30 @@ class ResultViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        # Permission: Teachers can only update results for pupils in their assigned classes
+        
         user = request.user
+        session = serializer.validated_data.get('session', instance.session)
+        term = serializer.validated_data.get('term', instance.term)
+        
+        # Check if teachers are allowed to upload
+        if getattr(user, 'role', None) == 'teacher':
+            if not session.teacher_upload_enabled:
+                return Response({
+                    'detail': 'Result uploads are currently disabled by admin.',
+                    'error': 'upload_disabled'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Check if updating active term results only
+            active_session = AcademicSession.objects.filter(is_active=True).first()
+            if active_session and session.id == active_session.id:
+                if term != active_session.current_term:
+                    return Response({
+                        'detail': f'You can only update results for the active term ({active_session.get_current_term_display()}).',
+                        'error': 'inactive_term',
+                        'active_term': active_session.current_term
+                    }, status=status.HTTP_403_FORBIDDEN)
+        
+        # Permission: Teachers can only update results for pupils in their assigned classes
         if getattr(user, 'role', None) == 'teacher':
             # Determine final pupil and subject after update
             final_pupil = serializer.validated_data.get('pupil', instance.pupil)
