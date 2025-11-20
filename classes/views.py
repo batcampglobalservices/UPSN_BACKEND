@@ -48,14 +48,23 @@ class ClassViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Optimize with select_related and prefetch_related"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         user = self.request.user
         base_queryset = Class.objects.select_related('assigned_teacher').prefetch_related('pupils')
 
-        if getattr(user, 'role', None) == 'admin':
+        user_role = getattr(user, 'role', None)
+        logger.info(f"🔍 ClassViewSet.get_queryset - User: {user.username}, Role: {user_role}, ID: {user.id}")
+
+        if user_role == 'admin':
+            logger.info(f"📋 Admin user - returning all classes")
             return base_queryset.all()
-        elif getattr(user, 'role', None) == 'teacher':
-            return base_queryset.filter(assigned_teacher=user)
-        elif getattr(user, 'role', None) == 'pupil':
+        elif user_role == 'teacher':
+            filtered_classes = base_queryset.filter(assigned_teacher=user)
+            logger.info(f"👨‍🏫 Teacher user - returning {filtered_classes.count()} classes assigned to teacher ID {user.id}")
+            return filtered_classes
+        elif user_role == 'pupil':
             # Pupils see only their own class
             try:
                 pupil_profile = user.pupil_profile
