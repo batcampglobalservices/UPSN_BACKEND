@@ -89,6 +89,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """Custom create to handle user creation with proper response"""
         import logging
+        from backend.realtime import broadcast_update
         logger = logging.getLogger(__name__)
         
         logger.info(f"Creating user with data: {request.data}")
@@ -98,6 +99,15 @@ class UserViewSet(viewsets.ModelViewSet):
         user = serializer.save()
         
         logger.info(f"User created successfully: {user.username} (ID: {user.id})")
+        
+        # Broadcast realtime update for user creation
+        broadcast_update('user_created', {
+            'action': 'create',
+            'user_id': user.id,
+            'username': user.username,
+            'role': user.role,
+            'full_name': user.full_name
+        })
         
         # Return the user with UserSerializer to include all fields
         output_serializer = UserSerializer(user)
