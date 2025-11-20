@@ -92,16 +92,24 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 ASGI_APPLICATION = 'backend.asgi.application'
 # Channels/Redis configuration for realtime
-REDIS_URL = config('REDIS_URL', default='redis://127.0.0.1:6379')
+REDIS_URL = config('REDIS_URL', default=None)
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [REDIS_URL],
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [REDIS_URL],
+            },
         },
-    },
-}
+    }
+else:
+    # Fallback for single-container deployments without Redis (e.g., Railway free tier)
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.CustomUser'
